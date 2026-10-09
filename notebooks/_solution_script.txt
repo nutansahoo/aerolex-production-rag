@@ -1,0 +1,170 @@
+import os
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")  # Windows: MKL + Torch OpenMP coexistence
+
+import numpy as np
+from aerolex import config
+from aerolex.loaders import load_documents
+from aerolex.chunking import chunk_corpus, load_chunks
+from aerolex.store import InMemoryVectorStore
+
+key = config.load_api_key()
+print("GEMINI_API_KEY:", "✓ found" if key else "✗ not found — offline fallback mode")
+print("gen model:", config.GEN_MODEL, "| embed model:", config.EMBED_MODEL, "| dim:", config.EMBED_DIM)
+
+docs = load_documents()
+for d in docs:
+    print(f"{d.doc_id:16s} {d.doc_type:6s} {len(d.text):>7,d} chars  {d.title}")
+
+# Prefer the pre-built cache (instant); otherwise chunk live.
+try:
+    chunks = load_chunks()
+    print(f"\nloaded {len(chunks)} chunks from cache")
+except FileNotFoundError:
+    chunks = chunk_corpus(docs)
+    print(f"\nchunked live: {len(chunks)} chunks")
+
+by_id = {c.chunk_id: c for c in chunks}
+art7 = next(c for c in chunks if c.section_label == "Article 7")
+print("\nExample chunk —", art7.citation)
+print(art7.text[:320], "…")
+
+import re
+
+# Keep words, the section sign §, and dotted/slashed numeric refs as single tokens.
+_TOKEN = re.compile(r"[a-z]+|\u00A7|\d+(?:[./-]\d+)*")
+
+def tokenize(text):
+    return _TOKEN.findall(text.lower())
+
+print(tokenize("See § 260.6 and Regulation 261/2004 under 14 CFR"))
+
+from aerolex.bm25 import BM25Index
+
+bm25 = BM25Index([c.chunk_id for c in chunks], [c.searchable_text for c in chunks])
+for cid, score in bm25.search("§ 260.6 refund for a cancelled flight", top_k=3):
+    print(f"{score:6.2f}  {by_id[cid].citation}")
+
+store = InMemoryVectorStore.load()          # cache/embeddings.npz
+print("vector store:", len(store), "vectors ×", store.matrix.shape[1], "dims")
+
+def cosine_search(query_vec, matrix, ids, top_k=5):
+    q = query_vec / (np.linalg.norm(query_vec) or 1.0)
+    M = matrix / np.linalg.norm(matrix, axis=1, keepdims=True)
+    scores = M @ q
+    order = np.argsort(-scores)[:top_k]
+    return [(ids[i], float(scores[i])) for i in order]
+
+# sanity: a row is most similar to itself (cosine ≈ 1.0)
+_hit = cosine_search(store.matrix[0], store.matrix, store.ids, top_k=1)[0]
+print(_hit[0] == store.ids[0], round(_hit[1], 4))
+
+# Embed a real query (1 API call) and search. Needs a key; else we reuse a chunk vector.
+query = "How much compensation for a long delayed flight under EU261?"
+if key:
+    from aerolex.embeddings import GeminiEmbedder
+    qvec = GeminiEmbedder().embed_query(query)
+else:
+    print("(no key — demoing with an existing chunk vector as the 'query')")
+    qvec = store.matrix[store.ids.index(art7.chunk_id)]
+
+dense_hits = cosine_search(qvec, store.matrix, store.ids, top_k=5)
+for cid, s in dense_hits:
+    print(f"{s:5.3f}  {by_id[cid].citation}")
+
+def rrf(rankings, k=60, top_k=10):
+    scores = {}
+    for ranked in rankings:
+        for rank, cid in enumerate(ranked):
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank + 1)
+    return sorted(scores.items(), key=lambda kv: -kv[1])[:top_k]
+
+assert rrf([["b", "a", "c"], ["b", "a", "d"]])[0][0] == "b"
+print("rrf OK")
+
+bm25_ids = [cid for cid, _ in bm25.search(query, top_k=20)]
+dense_ids = [cid for cid, _ in dense_hits]
+fused = rrf([bm25_ids, dense_ids], k=config.RRF_K, top_k=10)
+print("Fused top-5:")
+for cid, s in fused[:5]:
+    print(f"{s:.4f}  {by_id[cid].citation}")
+
+from aerolex.rerank import CrossEncoderReranker
+
+candidates = [(cid, by_id[cid].searchable_text) for cid, _ in fused]
+reranked = CrossEncoderReranker().rerank(query, candidates, top_k=config.RERANK_TOP_K)
+print("Re-ranked top chunks:")
+for cid, s in reranked:
+    print(f"{s:7.2f}  {by_id[cid].citation}")
+final_chunks = [by_id[cid] for cid, _ in reranked]
+
+CITE = re.compile(r"\[\[(\d+)\]\]")
+
+def resolve_citations(answer, index):
+    used = []
+    def keep(m):
+        n = int(m.group(1))
+        if n in index:
+            if n not in used:
+                used.append(n)
+            return m.group(0)
+        return ""                      # drop a citation to a non-existent passage
+    cleaned = CITE.sub(keep, answer)
+    return cleaned, [f"[[{n}]] {index[n]}" for n in sorted(used)]
+
+_c, _r = resolve_citations("A [[1]] and B [[9]].", {1: "EU261 Art 7", 2: "EU261 Art 5"})
+print(_c, "|", _r)
+
+from aerolex.generate import Generator
+
+result = Generator().generate(query, final_chunks)
+print("OFFLINE" if result["offline"] else "GEMINI", "answer:\n")
+print(result["answer"])
+print("\nReferences:")
+for r in result["references"]:
+    print("  ", r)
+
+from aerolex.memory import ConversationMemory
+
+mem = ConversationMemory()
+mem.add_user(query)
+mem.add_assistant(result["answer"][:160])
+print("follow-up : what about in the US?")
+print("standalone:", mem.condense("what about in the US?"))
+
+from aerolex.persistence import ProfileStore
+
+prof = ProfileStore()
+prof.remember("demo_user", "home_airport", "JFK")
+prof.remember("demo_user", "status", "Delta Platinum Medallion")
+print(prof.context_block("demo_user"))
+
+from aerolex.feedback import FeedbackStore
+
+fb = FeedbackStore()
+top_id = reranked[0][0]
+fb.record(query, qvec, top_id, +1)                 # 👍 the best chunk
+ranked = [(cid, s) for cid, s in reranked]
+adjusted = fb.apply(ranked, qvec)
+print("before:", [by_id[c].section_label for c, _ in ranked])
+print("after :", [by_id[c].section_label for c, _ in adjusted])
+
+from aerolex.pipeline import RagPipeline
+
+if key:
+    from aerolex.embeddings import GeminiEmbedder
+    pipe = RagPipeline(
+        chunks=chunks,
+        store=store,
+        bm25=bm25,
+        embedder=GeminiEmbedder(),
+        reranker=CrossEncoderReranker(),
+        generator=Generator(),
+    )
+    out = pipe.answer("If my 4000 km flight is cancelled, what am I owed?",
+                      memory=mem, profile=prof, user_id="demo_user")
+    print(out["answer"])
+    print("\nReferences:")
+    for r in out["references"]:
+        print("  ", r)
+else:
+    print("Set GEMINI_API_KEY to run the full generative pipeline.")
