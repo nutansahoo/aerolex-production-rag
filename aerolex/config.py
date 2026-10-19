@@ -48,11 +48,16 @@ RRF_TOP_K = 20         # size of the fused candidate pool handed to the re-ranke
 RERANK_TOP_K = 5       # final chunks kept as grounding context
 
 # --------------------------------------------------------------------------- #
-# Hierarchical chunking budgets (character-based for simplicity/transparency)
+# Hierarchical chunking budgets (words, not exact model tokens)
 # --------------------------------------------------------------------------- #
-CHUNK_MAX_CHARS = 1600     # split sections larger than this
-CHUNK_MIN_CHARS = 120      # drop/merge sections smaller than this (TOC noise, stubs)
-CHUNK_OVERLAP_CHARS = 150  # carried context between sub-chunks of one section
+CHUNK_MAX_WORDS = 320
+CHUNK_OVERLAP_WORDS = 40
+
+REFERENCE_EXPANSION_ENABLED = True
+REFERENCE_MAX_HOPS = 1
+REFERENCE_MAX_INCOMING = 2
+REFERENCE_MAX_ADDED_CHUNKS = 20
+REFERENCE_MAX_CONTEXT_WORDS = 6000
 
 
 def load_api_key() -> str | None:

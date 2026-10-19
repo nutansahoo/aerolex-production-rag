@@ -8,6 +8,7 @@ answer so the retrieval stack still demos offline.
 """
 from __future__ import annotations
 
+import json
 import re
 
 from . import config
@@ -21,6 +22,11 @@ _SYSTEM = (
     "must end with a citation tag like [[1]] or [[2]] referring to the passage "
     "you used. If the context does not answer the question, say so plainly. "
     "Never invent regulations, article numbers, or passage numbers."
+    " Distinguish entitlement, amounts, exceptions, and missing user facts. "
+    "A compensation table alone does not establish eligibility. Incoming references "
+    "are discovery links, not proof of applicability. If dependencies are missing "
+    "or omitted, state the limitation and do not give an unconditional entitlement. "
+    "Retrieval notes describe evidence limits; they are not legal evidence."
 )
 
 
@@ -33,10 +39,16 @@ def format_context(chunks) -> tuple[str, dict[int, str]]:
     return "\n\n".join(lines), index
 
 
-def build_prompt(query: str, context_text: str, profile_block: str = "") -> str:
+def build_prompt(query: str, context_text: str, profile_block: str = "",
+                 context_diagnostics: dict | None = None) -> str:
     parts = []
     if profile_block:
         parts.append(profile_block)
+    if context_diagnostics is not None:
+        notes = {"max_hops": context_diagnostics.get("max_hops"),
+                 "diagnostics": context_diagnostics.get("diagnostics", []),
+                 "scope": "Bounded explicit-reference lookup, not proof of complete legal applicability"}
+        parts.append("Retrieval notes (not legal evidence):\n" + json.dumps(notes, ensure_ascii=False))
     parts.append("Context passages:\n" + context_text)
     parts.append(f"Question: {query}")
     parts.append("Answer (cite every claim with [[n]]):")
@@ -73,17 +85,21 @@ class Generator:
 
             self.client = genai.Client(api_key=key)
 
-    def generate(self, query: str, chunks, profile_block: str = "") -> dict:
+    def generate(self, query: str, chunks, profile_block: str = "",
+                 context_diagnostics: dict | None = None) -> dict:
         context_text, index = format_context(chunks)
         if self.client is None:
-            return self._offline(query, chunks, index)
+            result = self._offline(query, chunks, index)
+            result["context_expansion"] = context_diagnostics
+            return result
 
-        prompt = _SYSTEM + "\n\n" + build_prompt(query, context_text, profile_block)
+        prompt = _SYSTEM + "\n\n" + build_prompt(
+            query, context_text, profile_block, context_diagnostics)
         text = generate_text(self.client, self.model, prompt)
         answer, references = resolve_citations(text, index)
         return {"answer": answer, "references": references,
                 "used_passages": [index[n] for n in range(1, len(index) + 1)],
-                "offline": False}
+                "offline": False, "context_expansion": context_diagnostics}
 
     def _offline(self, query: str, chunks, index: dict[int, str]) -> dict:
         """Extractive fallback when no API key is configured."""
