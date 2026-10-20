@@ -13,11 +13,27 @@ import numpy as np
 from aerolex import config
 from aerolex.bm25 import BM25Index
 from aerolex.store import InMemoryVectorStore
+from tests.helpers import corpus
 
 NOTEBOOKS = config.PROJECT_ROOT / "notebooks"
 
 
 class NotebookTests(unittest.TestCase):
+    def test_workshop_bm25_cells_accept_raw_query(self):
+        notebook = json.loads((NOTEBOOKS / "workshop.ipynb").read_text())
+        chunks = corpus()
+        env = {"chunks": chunks, "by_id": {c.chunk_id: c for c in chunks},
+               "BM25Index": BM25Index}
+        selected = {"9ad415be", "c93edd69", "16c66230", "b4d0b791"}
+        with contextlib.redirect_stdout(io.StringIO()):
+            for cell in notebook["cells"]:
+                if cell["id"] in selected:
+                    exec(compile("".join(cell["source"]), cell["id"], "exec"), env)
+        self.assertIsInstance(env["query"], str)
+        self.assertEqual(env["query_tokens"], ["refund", "cancelled", "flight"])
+        self.assertTrue(env["kw_search_chunks"])
+        self.assertTrue(all(cid in env["by_id"] for cid, _ in env["kw_search_chunks"]))
+
     def test_json_syntax_ids_and_script_sync(self):
         for path in NOTEBOOKS.glob("*.ipynb"):
             notebook = json.loads(path.read_text())
