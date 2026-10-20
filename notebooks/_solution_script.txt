@@ -222,7 +222,7 @@ if key:
         reranker=CrossEncoderReranker(),
         generator=Generator(),
     )
-    out = pipe.answer('For an EU261-covered non-intra-EU 4000 km flight cancelled one day before departure, with no extraordinary circumstances, I accept rerouting that arrives three hours late. What compensation amount and care apply?',
+    out = pipe.answer('If my 4000 km flight is cancelled, what am I owed?',
                       memory=mem, profile=prof, user_id="demo_user", expand_references=True)
     print(out["answer"])
     print("\nReferences:")
