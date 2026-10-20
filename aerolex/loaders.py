@@ -49,7 +49,7 @@ class Document:
 # --------------------------------------------------------------------------- #
 # Raw text extraction
 # --------------------------------------------------------------------------- #
-def extract_raw_text(path: str | Path) -> str:
+def extract_raw_text(path: str | Path, *, layout: bool = False) -> str:
     """Extract text from a PDF, preferring PyMuPDF and falling back to pypdf."""
     path = Path(path)
     # Prefer the modern `pymupdf` import; fall back to legacy `fitz`, then pypdf.
@@ -63,12 +63,14 @@ def extract_raw_text(path: str | Path) -> str:
             mod = None
     if mod is not None:
         with mod.open(path) as doc:
-            return "\f".join(page.get_text("text") for page in doc)
+            return "\f".join(page.get_text("text", sort=layout) for page in doc)
 
     from pypdf import PdfReader
 
     reader = PdfReader(str(path))
-    return "\f".join((page.extract_text() or "") for page in reader.pages)
+    # CFR PDF text-stream order moves indented clauses past later headings.
+    return "\f".join((page.extract_text(extraction_mode="layout") if layout
+                      else page.extract_text()) or "" for page in reader.pages)
 
 
 # --------------------------------------------------------------------------- #
@@ -90,10 +92,12 @@ _NOISE_PATTERNS: dict[str, list[re.Pattern]] = {
     "cfr": [
         re.compile(r"^.*\(enhanced display\).*$", re.M),
         re.compile(r"^\s*14 CFR Part 260 \(up to date.*$", re.M),
-        re.compile(r"^.*Refunds for Airline Fare and Ancillary Service Fees\s+14 CFR.*$", re.M),
+        re.compile(r"^\s*Refunds for Airline Fare and Ancillary Service Fees(?:\s+14 CFR.*)?\s*$", re.M),
     ],
     "delta": [
         re.compile(r"^\s*Page\s+\d+\s+of\s+\d+\s*$", re.M),
+        re.compile(r"^.*\.{4,}\s*\d+\s*$", re.M),  # remove full TOC entries, not just their tails
+        re.compile(r"^\s*Delta (?:Domestic|International) General Rules Tariff.*$", re.M),
     ],
 }
 
@@ -101,7 +105,7 @@ _NOISE_PATTERNS: dict[str, list[re.Pattern]] = {
 def clean_text(text: str, doc_type: str) -> str:
     """Strip page headers/footers, TOC leaders, and form-feeds."""
     text = text.replace("\f", "\n")
-    for pat in _NOISE_PATTERNS["common"] + _NOISE_PATTERNS.get(doc_type, []):
+    for pat in _NOISE_PATTERNS.get(doc_type, []) + _NOISE_PATTERNS["common"]:
         text = pat.sub("", text)
     # Collapse runs of blank lines and trailing spaces.
     text = re.sub(r"[ \t]+\n", "\n", text)
@@ -128,7 +132,7 @@ def load_documents(data_dir: str | Path | None = None) -> list[Document]:
         meta = _match_meta(pdf.name)
         if meta is None:
             continue  # ignore unknown files rather than guessing their structure
-        raw = extract_raw_text(pdf)
+        raw = extract_raw_text(pdf, layout=meta.doc_type == "cfr")
         docs.append(
             Document(
                 doc_id=meta.doc_id,

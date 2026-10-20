@@ -1,10 +1,15 @@
+import sys
+from pathlib import Path
+root = Path.cwd() if (Path.cwd() / 'aerolex').is_dir() else Path.cwd().parent
+sys.path.insert(0, str(root))
 import os
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")  # Windows: MKL + Torch OpenMP coexistence
 
 import numpy as np
 from aerolex import config
 from aerolex.loaders import load_documents
-from aerolex.chunking import chunk_corpus, load_chunks
+from aerolex.chunking import ChunkCacheError, chunk_corpus, load_chunks, save_chunks
+from aerolex.context import ReferenceExpander
 from aerolex.store import InMemoryVectorStore
 
 key = config.load_api_key()
@@ -15,18 +20,59 @@ docs = load_documents()
 for d in docs:
     print(f"{d.doc_id:16s} {d.doc_type:6s} {len(d.text):>7,d} chars  {d.title}")
 
-# Prefer the pre-built cache (instant); otherwise chunk live.
 try:
-    chunks = load_chunks()
-    print(f"\nloaded {len(chunks)} chunks from cache")
-except FileNotFoundError:
+    chunks = load_chunks(documents=docs)
+except (FileNotFoundError, ChunkCacheError) as error:
+    print(f"Building current chunk cache: {error}")
     chunks = chunk_corpus(docs)
-    print(f"\nchunked live: {len(chunks)} chunks")
+    save_chunks(chunks, documents=docs)
 
 by_id = {c.chunk_id: c for c in chunks}
-art7 = next(c for c in chunks if c.section_label == "Article 7")
-print("\nExample chunk —", art7.citation)
-print(art7.text[:320], "…")
+expander = ReferenceExpander(chunks)
+art5 = next(c for c in chunks if c.section_id == ("eu261", "Article 5"))
+art7 = next(c for c in chunks if c.section_id == ("eu261", "Article 7"))
+assert all(len(c.text.split()) <= config.CHUNK_MAX_WORDS for c in chunks)
+print(f"Loaded {len(chunks)} chunks; largest: {max(len(c.text.split()) for c in chunks)} words")
+
+import json
+from dataclasses import asdict
+
+print(json.dumps(asdict(art5), ensure_ascii=False, indent=2))
+print("Resolved targets:", list(dict.fromkeys(by_id[cid].citation for cid in art5.references)))
+external = next(m for c in chunks if c.section_id == ("eu261", "Article 2")
+                for m in c.reference_mentions if m.status == "external")
+print("Not guessed as local Article 2:", json.dumps(asdict(external), ensure_ascii=False))
+
+def fetch_referenced_chunks(chunk, by_id):
+    return [by_id[cid] for cid in dict.fromkeys(chunk.references)]
+
+def assemble_context(seed_chunks):
+    return expander.expand(seed_chunks)
+
+assert fetch_referenced_chunks(art5, by_id)
+assert art5.chunk_id in assemble_context([art5]).seed_ids
+
+for seed in (art5, art7):
+    context = expander.expand([seed])
+    print("\nBaseline:", seed.citation)
+    print("Expanded sections:", list(dict.fromkeys(c.section_id for c in context.chunks)))
+    print("Discovery edges:", list(dict.fromkeys(
+        (e.direction, e.source_section, e.target_section) for e in context.provenance)))
+    print("Limits / missing evidence:", json.dumps(context.metadata()["diagnostics"], ensure_ascii=False))
+    print("Evidence words:", context.metadata()["evidence_words"])
+
+# Seed-controlled evidence coverage, NOT a claim about search or answer accuracy.
+examples = [
+    ("Cancellation compensation", art5, {"Article 5", "Article 7"}),
+    ("Rerouting reduction", art7, {"Article 7", "Article 8"}),
+    ("Care after cancellation", art5, {"Article 5", "Article 9"}),
+]
+print("\nQuestion | baseline coverage | expanded coverage | words")
+for question, seed, required in examples:
+    evidence = expander.expand([seed])
+    present = {c.section_label for c in evidence.chunks}
+    print(question, f"{len(required & {seed.section_label})}/{len(required)}",
+          f"{len(required & present)}/{len(required)}", evidence.metadata()["evidence_words"], sep=" | ")
 
 import re
 
@@ -44,8 +90,19 @@ bm25 = BM25Index([c.chunk_id for c in chunks], [c.searchable_text for c in chunk
 for cid, score in bm25.search("§ 260.6 refund for a cancelled flight", top_k=3):
     print(f"{score:6.2f}  {by_id[cid].citation}")
 
-store = InMemoryVectorStore.load()          # cache/embeddings.npz
-print("vector store:", len(store), "vectors ×", store.matrix.shape[1], "dims")
+# Rebuild vectors once after rechunking; references themselves need no embedding calls.
+if config.EMBEDDINGS_CACHE.exists():
+    store = InMemoryVectorStore.load()
+    store.validate_chunks(chunks)
+elif key:
+    from aerolex.embeddings import GeminiEmbedder
+    matrix = GeminiEmbedder().embed_documents([c.searchable_text for c in chunks])
+    store = InMemoryVectorStore.from_chunks(chunks, matrix)
+    store.save()
+else:
+    raise RuntimeError("Feature #1 works offline. Later retrieval needs matching embeddings; "
+                       "set GEMINI_API_KEY to build them, or supply a current validated cache.")
+print("vector store:", len(store), "vectors x", store.matrix.shape[1], "dims")
 
 def cosine_search(query_vec, matrix, ids, top_k=5):
     q = query_vec / (np.linalg.norm(query_vec) or 1.0)
@@ -95,7 +152,12 @@ reranked = CrossEncoderReranker().rerank(query, candidates, top_k=config.RERANK_
 print("Re-ranked top chunks:")
 for cid, s in reranked:
     print(f"{s:7.2f}  {by_id[cid].citation}")
-final_chunks = [by_id[cid] for cid, _ in reranked]
+# Reranking selects seeds; reference expansion assembles supporting evidence.
+baseline_chunks = [by_id[cid] for cid, _ in reranked]
+context = expander.expand(baseline_chunks)
+final_chunks = context.chunks
+print("Seed chunks:", len(baseline_chunks), "| evidence chunks:", len(final_chunks))
+print("Evidence limits:", context.metadata()["diagnostics"])
 
 CITE = re.compile(r"\[\[(\d+)\]\]")
 
@@ -116,7 +178,7 @@ print(_c, "|", _r)
 
 from aerolex.generate import Generator
 
-result = Generator().generate(query, final_chunks)
+result = Generator().generate(query, final_chunks, context_diagnostics=context.metadata())
 print("OFFLINE" if result["offline"] else "GEMINI", "answer:\n")
 print(result["answer"])
 print("\nReferences:")
@@ -160,8 +222,8 @@ if key:
         reranker=CrossEncoderReranker(),
         generator=Generator(),
     )
-    out = pipe.answer("If my 4000 km flight is cancelled, what am I owed?",
-                      memory=mem, profile=prof, user_id="demo_user")
+    out = pipe.answer('If my 4000 km flight is cancelled, what am I owed?',
+                      memory=mem, profile=prof, user_id="demo_user", expand_references=True)
     print(out["answer"])
     print("\nReferences:")
     for r in out["references"]:
