@@ -26,15 +26,6 @@ EMBEDDINGS_CACHE = CACHE_DIR / "embeddings.npz"
 PROFILE_DB = CACHE_DIR / "user_profiles.sqlite3"   # long-term memory (feature #9)
 FEEDBACK_DB = CACHE_DIR / "feedback.sqlite3"        # FLAIR feedback (feature #10)
 
-# --------------------------------------------------------------------------- #
-# Gemini models  (names change often — verify with scripts/list_models.py)
-# --------------------------------------------------------------------------- #
-EMBED_MODEL = "gemini-embedding-001"
-# gemini-embedding-001 supports Matryoshka dims (768 / 1536 / 3072).
-# 768 keeps the in-memory matrix small and cosine fast for a workshop.
-EMBED_DIM = 768
-GEN_MODEL = "gemini-flash-latest"
-
 # Cross-encoder re-ranker runs locally (Gemini has no cross-encoder).
 RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 

@@ -14,7 +14,6 @@ from . import config
 # "261/2004", "14") as single tokens so exact statute matching works.
 _TOKEN_RE = re.compile(r"[a-z]+|\u00A7|\d+(?:[./-]\d+)*")
 
-
 def tokenize(text: str) -> list[str]:
     return _TOKEN_RE.findall(text.lower())
 
@@ -31,10 +30,10 @@ class BM25Index:
         self._tokens = [tokenize(t) for t in texts]
         self._bm25 = BM25Okapi(self._tokens)
 
-    def search(self, query: str, top_k: int = config.BM25_TOP_K
+    def search(self, query_tokens: list[str], top_k: int = config.BM25_TOP_K
                ) -> list[tuple[str, float]]:
         """Return the ``top_k`` (chunk_id, bm25_score) pairs, best first."""
-        scores = self._bm25.get_scores(tokenize(query))
+        scores = self._bm25.get_scores(query_tokens)
         top_k = min(top_k, len(scores))
         order = sorted(range(len(scores)), key=lambda i: -scores[i])[:top_k]
         return [(self.ids[i], float(scores[i])) for i in order]

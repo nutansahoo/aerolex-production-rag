@@ -16,8 +16,7 @@ from . import config
 
 
 class GeminiEmbedder:
-    def __init__(self, api_key: str | None = None,
-                 model: str = config.EMBED_MODEL, dim: int = config.EMBED_DIM):
+    def __init__(self, model: str, dim: int, api_key: str | None = None):
         from google import genai
 
         key = api_key or config.load_api_key()
