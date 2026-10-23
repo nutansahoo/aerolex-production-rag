@@ -41,7 +41,7 @@ BM25_TOP_K = 20        # candidates from sparse search
 DENSE_TOP_K = 20       # candidates from dense search
 RRF_K = 60             # reciprocal rank fusion constant (standard default)
 RRF_TOP_K = 20         # size of the fused candidate pool handed to the re-ranker
-RERANK_TOP_K = 5       # final chunks kept as grounding context
+RERANK_TOP_K = 10       # final chunks kept as grounding context
 
 # --------------------------------------------------------------------------- #
 # Hierarchical chunking budgets (character-based for simplicity/transparency)
