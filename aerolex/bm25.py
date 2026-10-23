@@ -30,9 +30,11 @@ class BM25Index:
         self._tokens = [tokenize(t) for t in texts]
         self._bm25 = BM25Okapi(self._tokens)
 
-    def search(self, query_tokens: list[str], top_k: int = config.BM25_TOP_K
+    def search(self, query_tokens: str | list[str], top_k: int = config.BM25_TOP_K
                ) -> list[tuple[str, float]]:
         """Return the ``top_k`` (chunk_id, bm25_score) pairs, best first."""
+        if isinstance(query_tokens, str):
+            query_tokens = tokenize(query_tokens)
         scores = self._bm25.get_scores(query_tokens)
         top_k = min(top_k, len(scores))
         order = sorted(range(len(scores)), key=lambda i: -scores[i])[:top_k]

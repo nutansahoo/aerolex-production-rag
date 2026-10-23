@@ -26,6 +26,11 @@ EMBEDDINGS_CACHE = CACHE_DIR / "embeddings.npz"
 PROFILE_DB = CACHE_DIR / "user_profiles.sqlite3"   # long-term memory (feature #9)
 FEEDBACK_DB = CACHE_DIR / "feedback.sqlite3"        # FLAIR feedback (feature #10)
 
+# Gemini settings used by the workshop notebook and its embedding cache.
+GEN_MODEL = "gemini-flash-latest"
+EMBED_MODEL = "gemini-embedding-001"
+EMBED_DIM = 768
+
 # Cross-encoder re-ranker runs locally (Gemini has no cross-encoder).
 RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 

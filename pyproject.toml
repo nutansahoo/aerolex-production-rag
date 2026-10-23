@@ -5,13 +5,19 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aerolex"
 version = "0.1.0"
-description = "Production-grade RAG workshop over airline passenger-rights law"
+description = "A multi-stage RAG pipeline over airline passenger-rights law."
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "numpy", "pandas", "scikit-learn",
-    "pymupdf", "pypdf", "rank-bm25",
-    "sentence-transformers", "torch",
-    "google-genai", "python-dotenv", "tqdm",
+    "numpy",
+    "pymupdf",
+    "pypdf",
+    "rank-bm25",
+    "python-dotenv",
+    "google-genai>=2,<3",
+    "sentence-transformers",
+    "ipykernel",
+    "jupyterlab",
 ]
 
 [tool.setuptools]
