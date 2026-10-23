@@ -220,8 +220,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Generated workshop caches and local user state
-/cache/chunks.json
-/cache/embeddings.npz
 /cache/user_profiles.sqlite3
 /cache/user_profiles.sqlite3-journal
 /cache/user_profiles.sqlite3-wal
