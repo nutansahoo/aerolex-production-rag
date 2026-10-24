@@ -1,7 +1,7 @@
 # AeroLex — production-grade RAG workshop
-# Primary setup path:  conda env create -f environment.yml
-# Then register the kernel:  python -m ipykernel install --user --name aerolex
-name: aerolex
+# Conda setup path:  conda env create -f environment.yml
+# Then register the kernel:  python -m ipykernel install --user --name aerolex-rag --display-name "Python (aerolex-rag)"
+name: aerolex-rag
 channels:
   - conda-forge
 dependencies:
