@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import asdict, dataclass
-from typing import Iterable
+from typing import Iterable, Iterator
 
 from . import config
 from .loaders import Document
@@ -127,8 +127,8 @@ def _split_oversized(body: str, max_chars: int, overlap: int) -> list[str]:
     return chunks
 
 
-def chunk_document(doc: Document) -> list[Chunk]:
-    """Split one document into hierarchical, metadata-rich chunks."""
+def iter_document_sections(doc: Document) -> Iterator[tuple[str, str, str, int]]:
+    """Yield (label, heading, body, section offset) before any body splitting."""
     text = doc.text
     # The CFR repeats every "§ 260.x" in a table of contents; skip to the body.
     if doc.doc_type == "cfr":
@@ -149,7 +149,6 @@ def chunk_document(doc: Document) -> list[Chunk]:
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         sections.append((_section_label(doc.doc_type, m.group(1)), text[start:end], start))
 
-    chunks: list[Chunk] = []
     for label, sec_text, char_start in sections:
         if label == "Preamble":
             heading, body = "Preamble (Recitals)", sec_text.strip()
@@ -157,7 +156,13 @@ def chunk_document(doc: Document) -> list[Chunk]:
             heading, body = _derive_heading(sec_text, doc.doc_type, label)
         if len(body) < config.CHUNK_MIN_CHARS:
             continue  # skip stubs / leftover TOC fragments
+        yield label, heading, body, char_start
 
+
+def chunk_document(doc: Document) -> list[Chunk]:
+    """Split one document into hierarchical, metadata-rich chunks."""
+    chunks: list[Chunk] = []
+    for label, heading, body, char_start in iter_document_sections(doc):
         parts = _split_oversized(body, config.CHUNK_MAX_CHARS, config.CHUNK_OVERLAP_CHARS)
         slug = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
         for pi, part in enumerate(parts):

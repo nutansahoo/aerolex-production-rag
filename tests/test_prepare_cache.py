@@ -1,10 +1,11 @@
 import contextlib
+from dataclasses import replace
 import io
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 
@@ -127,6 +128,77 @@ class PrepareCacheTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "round-trip"):
                 prepare_cache()
         self.assertEqual(list(self.directory.iterdir()), [])
+
+    def test_alternate_paths_leave_existing_baseline_caches_untouched(self):
+        self.chunks_path.write_bytes(b"baseline chunks")
+        self.embeddings_path.write_bytes(b"baseline embeddings")
+        alternate_chunks = [
+            replace(c, chunk_id=f"recursive::{c.chunk_id}") for c in self.chunks
+        ]
+        alternate_chunker = Mock(return_value=alternate_chunks)
+        chunks_path = self.directory / "chunks_recursive.json"
+        embeddings_path = self.directory / "embeddings_recursive.npz"
+        prepare_cache(
+            chunker=alternate_chunker,
+            chunks_path=chunks_path,
+            embeddings_path=embeddings_path,
+        )
+        self.chunker.assert_not_called()
+        alternate_chunker.assert_called_once_with(self.docs.return_value)
+        ids = [c.chunk_id for c in alternate_chunks]
+        self.assertEqual([c.chunk_id for c in load_chunks(chunks_path)], ids)
+        self.assertEqual(InMemoryVectorStore.load(embeddings_path).ids, ids)
+        self.assertEqual(self.chunks_path.read_bytes(), b"baseline chunks")
+        self.assertEqual(self.embeddings_path.read_bytes(), b"baseline embeddings")
+
+    def test_either_alternate_cache_prevents_api_calls(self):
+        paths = (
+            self.directory / "chunks_recursive.json",
+            self.directory / "embeddings_recursive.npz",
+        )
+        alternate_chunker = Mock()
+        for path in paths:
+            with self.subTest(path=path):
+                path.write_bytes(b"existing alternate cache")
+                with self.assertRaises(FileExistsError):
+                    prepare_cache(
+                        chunker=alternate_chunker,
+                        chunks_path=paths[0],
+                        embeddings_path=paths[1],
+                    )
+                self.embedder.assert_not_called()
+                self.docs.assert_not_called()
+                alternate_chunker.assert_not_called()
+                self.assertEqual(path.read_bytes(), b"existing alternate cache")
+                path.unlink()
+
+    def test_recursive_entry_point_selects_its_chunker_and_paths(self):
+        from aerolex import prepare_recursive_cache
+        from aerolex.chunking_recursive import chunk_corpus_recursive
+
+        with patch("sys.argv", ["prepare_recursive_cache"]), patch.object(
+            prepare_recursive_cache, "prepare_cache"
+        ) as builder:
+            prepare_recursive_cache.main()
+        builder.assert_called_once_with(
+            chunker=chunk_corpus_recursive,
+            chunks_path=config.RECURSIVE_CHUNKS_CACHE,
+            embeddings_path=config.RECURSIVE_EMBEDDINGS_CACHE,
+        )
+
+    def test_help_never_starts_cache_preparation(self):
+        from aerolex import prepare_cache as baseline_module
+        from aerolex import prepare_recursive_cache
+
+        for module in (baseline_module, prepare_recursive_cache):
+            with self.subTest(module=module.__name__):
+                with patch("sys.argv", [module.__name__, "--help"]), patch.object(
+                    module, "prepare_cache"
+                ) as builder:
+                    with self.assertRaises(SystemExit) as raised:
+                        module.main()
+                    self.assertEqual(raised.exception.code, 0)
+                    builder.assert_not_called()
 
 
 if __name__ == "__main__":
