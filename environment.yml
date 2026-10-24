@@ -1,0 +1,27 @@
+# AeroLex — production-grade RAG workshop
+# Primary setup path:  conda env create -f environment.yml
+# Then register the kernel:  python -m ipykernel install --user --name aerolex
+name: aerolex
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  # Scientific / notebook base (robust via conda)
+  - numpy>=1.26,<2.1
+  - pandas>=2.0
+  - scikit-learn>=1.3
+  - jupyterlab>=4.0
+  - ipykernel>=6.29
+  - ipywidgets>=8.1
+  - tqdm>=4.66
+  # ML / API layer (newer wheels via pip)
+  - pip:
+      - pymupdf>=1.24
+      - pypdf>=4.0
+      - rank-bm25>=0.2.2
+      - sentence-transformers>=3.0
+      - torch>=2.2
+      - google-genai>=1.0
+      - python-dotenv>=1.0
+      - pytest>=8.0
