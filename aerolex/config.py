@@ -21,6 +21,8 @@ CACHE_DIR.mkdir(exist_ok=True)
 # Pre-computed artifacts (so the live notebook never re-parses or re-embeds).
 CHUNKS_CACHE = CACHE_DIR / "chunks.json"
 EMBEDDINGS_CACHE = CACHE_DIR / "embeddings.npz"
+RECURSIVE_CHUNKS_CACHE = CACHE_DIR / "chunks_recursive.json"
+RECURSIVE_EMBEDDINGS_CACHE = CACHE_DIR / "embeddings_recursive.npz"
 
 # SQLite stores for the stateful features.
 PROFILE_DB = CACHE_DIR / "user_profiles.sqlite3"   # long-term memory (feature #9)

@@ -4,18 +4,30 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Callable, Iterable
 
 import numpy as np
 
 from . import config
-from .chunking import chunk_corpus, load_chunks, save_chunks
+from .chunking import Chunk, chunk_corpus, load_chunks, save_chunks
 from .embeddings import GeminiEmbedder
-from .loaders import DOCUMENTS, load_documents
+from .loaders import DOCUMENTS, Document, load_documents
 from .store import InMemoryVectorStore
 
 
-def prepare_cache() -> None:
-    for path in (config.CHUNKS_CACHE, config.EMBEDDINGS_CACHE):
+def prepare_cache(
+    *,
+    chunker: Callable[[Iterable[Document]], list[Chunk]] | None = None,
+    chunks_path: str | Path | None = None,
+    embeddings_path: str | Path | None = None,
+) -> None:
+    """Build a matching cache pair; omitted arguments retain the baseline."""
+    chunker = chunker if chunker is not None else chunk_corpus
+    chunks_path = Path(chunks_path) if chunks_path is not None else config.CHUNKS_CACHE
+    embeddings_path = (
+        Path(embeddings_path) if embeddings_path is not None else config.EMBEDDINGS_CACHE
+    )
+    for path in (chunks_path, embeddings_path):
         if path.exists():
             raise FileExistsError(
                 f"Cache already exists: {path}. No embeddings were requested. "
@@ -27,7 +39,7 @@ def prepare_cache() -> None:
     if len(docs) != len(expected_docs) or {d.doc_id for d in docs} != expected_docs:
         raise ValueError(f"Expected all four workshop PDFs in {config.DATA_DIR}.")
 
-    chunks = chunk_corpus(docs)
+    chunks = chunker(docs)
     ids = [chunk.chunk_id for chunk in chunks]
     if not ids or len(set(ids)) != len(ids):
         raise ValueError("Expected nonempty chunks with unique IDs.")
@@ -66,11 +78,11 @@ def prepare_cache() -> None:
                 or not np.isfinite(loaded_store.matrix).all()):
             raise ValueError("Cache round-trip validation failed.")
 
-        staged_chunks.replace(config.CHUNKS_CACHE)
-        staged_embeddings.replace(config.EMBEDDINGS_CACHE)
+        staged_chunks.replace(chunks_path)
+        staged_embeddings.replace(embeddings_path)
 
-    print(f"Saved: {config.CHUNKS_CACHE}")
-    print(f"Saved: {config.EMBEDDINGS_CACHE}")
+    print(f"Saved: {chunks_path}")
+    print(f"Saved: {embeddings_path}")
     print(f"Cache verified: {expected_shape}")
 
 

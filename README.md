@@ -7,19 +7,20 @@
 git clone https://github.com/nutansahoo/aerolex-production-rag.git
 ```
 
-## Workshop setup (Windows / PowerShell)
+## Workshop setup (Windows, macOS, and Linux)
 
 Complete these steps before the workshop. Run the commands from the project root, the folder containing [environment.yml](environment.yml) and
 [pyproject.toml](pyproject.toml).
+Unless labeled otherwise, the commands work in PowerShell (Windows) and
+Bash or Zsh (macOS / Linux).
 
 ### 1. Install prerequisites
 
-- Install [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install)
-  or Anaconda. The workshop environment uses Python 3.11; a separate Python
-  installation is not required.
-- Use a Conda-enabled PowerShell terminal. If `conda` is not recognized in your
-  regular PowerShell terminal, open Anaconda Prompt, run `conda init powershell`,
-  then close and reopen PowerShell.
+- Choose **Conda or venv** in step 3; you do not need both. For Conda, install
+  [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install)
+  or Anaconda (it installs Python for you). For venv, install
+  [Python 3.11](https://www.python.org/downloads/) with pip first; Conda is not
+  required.
 - Download or clone the workshop project and keep its `data` and `cache` folders.
   Internet access is needed for package installation, Gemini API requests, and
   the first download of the local cross-encoder model. A GPU is not required.
@@ -36,23 +37,96 @@ Complete these steps before the workshop. Run the commands from the project root
 3. Open the [API keys page](https://aistudio.google.com/apikey) and choose the
    option to create an API key. Create or select a Google Cloud project if
    prompted; import an existing project into AI Studio if needed.
-4. Copy the key and keep it private. Add that key to your environment variable. 
+4. Copy the key and keep it private. Configure it using one of the options in step 4.
 
 
-### 3. Create the Conda environment and install all packages
+### 3. Create an environment and install the project
 
-Navigate to your copy of the project and run the following commands:
+From the repository root, choose **one** of the following paths.
 
-```powershell
+#### Option A: Conda (all platforms)
+
+Use a Conda-enabled terminal. On Windows, initialize PowerShell by running
+`conda init powershell` from Anaconda Prompt. On macOS / Linux, use
+`conda init bash` or `conda init zsh` for your shell from a terminal where
+Conda is available. Close and reopen the terminal after initialization.
+
+```shell
 conda env create -f environment.yml
-conda activate aerolex
+conda activate aerolex-rag
 python -m pip install -e .
 ```
 
-The environment file installs Python 3.11 and the complete workshop stack. 
-Create the Conda environment first to install the workshop dependencies. Then run `python -m pip install -e .` to make the local aerolex package available to the notebooks.
+The environment file installs Python 3.11 and workshop dependencies.
+The editable install makes the local `aerolex` package available to notebooks
+and installs any remaining dependencies declared in `pyproject.toml`.
+
+#### Option B: Python venv (no Conda required)
+
+**Windows / PowerShell**
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e .
+```
+
+If PowerShell blocks activation, no execution-policy change is required.
+Instead, use the environment's Python directly for installation and all later
+`python` commands:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e .
+```
+
+**macOS / Linux (Bash or Zsh)**
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+```
+
+If Python 3.11 is installed under a different command, use that command to
+create the environment. Some Linux distributions require their Python 3.11
+`venv` OS package if environment creation reports it missing.
+
+The venv path installs dependencies from `pyproject.toml`, not the Conda
+environment's additional tooling or exact version constraints. `.venv/` is
+already ignored by Git.
+
+**For either path:** select the `aerolex-rag` or `.venv` environment's kernel
+in VS Code. An existing environment with the required dependencies is also
+fine. The Python import remains `aerolex` regardless of environment name.
+Continue with the shared steps below.
 
 ### 4. Set the Gemini API key
+
+**Option A: local `.env` file (recommended; works on all platforms)**
+
+1. In your editor, create a plain-text file named exactly `.env` in the
+   repository root, alongside `pyproject.toml`.
+2. Add the following line, replacing the placeholder with your actual key,
+   then save:
+
+   ```dotenv
+   GEMINI_API_KEY=your_actual_key_here
+   ```
+
+The notebook and cache-preparation commands automatically load this file via
+`aerolex.config.load_api_key()` and `python-dotenv`; no shell export or notebook
+code changes are needed. An existing `GEMINI_API_KEY` environment variable
+takes precedence over `.env`. Restart the notebook kernel after changing the
+file so it can load the new value.
+
+`.env` is already ignored by Git. NEVER commit it or paste the key into
+notebook cells, outputs, or screenshots. From the repository root,
+`git check-ignore .env` should print `.env`. Step 5 verifies key presence
+without displaying it.
+
+**Option B: environment variable (instead of `.env`)**
+
+**Windows / PowerShell**
 
 Set `GEMINI_API_KEY` in the same PowerShell terminal that will launch Jupyter:
 
@@ -69,89 +143,98 @@ OR Follow these steps:
   - Variable value: Your API key, without quotes.
 3. Click OK on all dialogs, then fully close and reopen VS Code.
 
+**macOS / Linux (Bash or Zsh)**
+
+In the terminal that will launch Jupyter, securely enter the key without
+putting its value in shell history:
+
+```bash
+export GEMINI_API_KEY="$(python -c 'import getpass; print(getpass.getpass("Gemini API key: "))')"
+```
+
+This applies only to that terminal session and processes launched from it.
+Use Option A for persistent local configuration without shell-profile changes.
+
 ### 5. Verify the environment
 
-With `aerolex` activated, run:
+With your chosen environment active, run (or use its Python executable directly):
 
-```powershell
+```shell
 python --version
 python -m pip check
-python scripts\check_env.py
+python -c "import aerolex; print(aerolex.__file__)"
 python -c "from aerolex.config import load_api_key; key = load_api_key(); print('GEMINI_API_KEY is configured' if key else 'GEMINI_API_KEY is missing'); raise SystemExit(0 if key else 1)"
 ```
-Expect Python 3.11, no broken package requirements, successful package imports,
-and four corpus PDFs. The final command checks key presence without printing.
+Expect the selected Python version, no broken package requirements, and a path
+to this checkout's `aerolex` package. The final command checks key presence
+without printing it.
 
-## Customize answer-generation prompts
+## Comparing chunking strategies
 
-Pass `system_prompt` and/or `user_prompt_template` to
-`Generator.generate(...)`. Omitting either argument (or passing `None`) keeps
-its original default. Overrides apply only to that call.
+The notebook supports two strategies with the same `Chunk` schema and legal
+citations:
 
-In a notebook, after retrieving `final_chunks`, you can edit either prompt:
+| Strategy | Body splitting | Cache files under `cache/` |
+| --- | --- | --- |
+| `hierarchical` (default) | Existing paragraph packing and character-window fallback | `chunks.json`, `embeddings.npz` |
+| `recursive` | LangChain `RecursiveCharacterTextSplitter` within the same legal sections | `chunks_recursive.json`, `embeddings_recursive.npz` |
 
-```python
-from aerolex.generate import DEFAULT_SYSTEM_PROMPT, Generator
+The recursive splitter tries paragraphs, lines, spaces, then individual
+characters. It uses a 1,600-character body limit and 150-character target
+overlap. Actual overlap can be smaller; sentence boundaries are not guaranteed.
+The heading prepended for retrieval is additional to the body limit. This is
+not semantic or token-based chunking, and improved retrieval quality is not
+assumed. The original custom strategy and its caches remain unchanged.
 
-system_prompt = DEFAULT_SYSTEM_PROMPT + "\nExplain in plain language."
-user_prompt_template = (
-    "{profile_block}\n\n"
-    "Context passages:\n{context_text}\n\n"
-    "Question: {query}\n\n"
-    "Give a concise answer and cite every factual claim with [[chunk_id]]:"
-)
+### One-time recursive cache preparation
 
-result = Generator().generate(
-    query,
-    final_chunks,
-    system_prompt=system_prompt,
-    user_prompt_template=user_prompt_template,
-)
-print(result)
+With your chosen environment active (or using its Python executable directly),
+run from the repository root:
+
+```bash
+python -m pip install -e .
+python -m aerolex.prepare_recursive_cache
 ```
 
-The user prompt template uses Python `str.format` placeholders:
+The install adds the lightweight `langchain-text-splitters` dependency; the
+full LangChain application stack is not required. The preparation command
+uses the existing PDF loader and legal-section parser, recursively splits the
+original section bodies, and embeds their searchable text with the same Gemini
+model and dimensions as the baseline. It validates and saves a matching chunk
+and embedding pair, ending with `Cache verified: (N, 768)`. The chunk count
+`N` need not match the baseline.
 
-| Placeholder | Inserted value |
-|---|---|
-| `{query}` | The question passed to generation |
-| `{context_text}` | Retrieved passages labeled with their chunk IDs and source citations |
-| `{profile_block}` | User-profile text, or an empty string when not supplied |
+**Preparation sends corpus text to Gemini and consumes API quota.** Configure
+`GEMINI_API_KEY` first. The command refuses to overwrite either recursive cache
+file and never changes the baseline caches. Failed API requests or interrupted
+runs may consume quota; completed batches are not checkpointed. To rebuild
+intentionally, move both recursive files aside first. Rebuild the pair whenever
+the corpus, splitter settings, or embedding model/dimensions change.
 
-A custom template replaces the entire default user prompt; content is not
-automatically appended if its placeholder is omitted. Keep `{context_text}`,
-`{query}`, and the `[[chunk_id]]` citation instructions for grounded answers. Include
-`{profile_block}` to retain profile personalization. Use `{{` and `}}` for
-literal braces, such as in JSON examples. Unknown placeholders and malformed
-format strings raise `ValueError`, including in offline mode.
+### Select the notebook strategy
 
-The full pipeline accepts the same overrides and supplies the retrieved context
-and profile automatically:
+In the setup cell of `notebooks/workshop_solution.ipynb`, choose:
 
 ```python
-out = pipe.answer(
-    "If my flight is cancelled, what am I owed?",
-    memory=mem,
-    profile=prof,
-    user_id="demo_user",
-    system_prompt=system_prompt,
-    user_prompt_template=user_prompt_template,
-)
-print(out["answer"])
+CHUNKING_STRATEGY = "recursive"  # "hierarchical" keeps the existing baseline
 ```
 
-These options change answer generation, not query rewriting or retrieval.
-`Generator.generate(...)` returns a plain string, both online and offline.
-It accepts chunk objects or a prebuilt context string and does not resolve,
-validate, or remove citation markers. The standalone `resolve_citations`
-helper remains available for explicit use but is not called by generation or
-the pipeline.
+Restart the kernel and run top to bottom after changing this setting. Directly
+under the hierarchical example, the new cell defines `alternate_chunks`,
+prints a citation example, and selects the downstream `chunks`, lookup
+metadata, and embedding-cache path together. If recursive chunks are not
+cached, that cell can split them locally without API calls, but section 3
+still requires the separately prepared recursive embeddings.
 
-`RagPipeline.answer(...)` wraps that string in a dictionary with `answer`,
-`query`, `standalone_query`, and `chunks`. It does not return a `references`
-field; remove any `out["references"]` printing loop. Retrieved sources can
-still be inspected through `out["chunks"]`.
+Do not replace `chunks` alone while keeping the baseline vector store: vectors
+must correspond to the selected chunk IDs and text. The notebook checks ordered
+ID alignment and dimensions before retrieval. BM25 is rebuilt from the selected
+chunks; reranking, citations, and the final pipeline use the same selection.
+Recursive IDs are namespaced so baseline feedback votes cannot attach to
+different recursive passages.
 
-Without an API key, generation returns an offline-mode notice followed by the
-formatted context (or the supplied context string), rather than calling an LLM.
-Prompt customization requires LLM generation.
+For a comparison, keep PDFs, size settings, embedding model, and retrieval
+settings fixed. Chunk counts, boundaries, and overlap behavior will still
+differ. Existing profile/feedback state and conversational history can affect
+outputs; a clean kernel resets in-memory history, not persisted SQLite state.
+This adds a comparison option, not an automated quality evaluation.
