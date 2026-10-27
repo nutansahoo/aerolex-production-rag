@@ -81,3 +81,77 @@ python -c "from aerolex.config import load_api_key; key = load_api_key(); print(
 ```
 Expect Python 3.11, no broken package requirements, successful package imports,
 and four corpus PDFs. The final command checks key presence without printing.
+
+## Customize answer-generation prompts
+
+Pass `system_prompt` and/or `user_prompt_template` to
+`Generator.generate(...)`. Omitting either argument (or passing `None`) keeps
+its original default. Overrides apply only to that call.
+
+In a notebook, after retrieving `final_chunks`, you can edit either prompt:
+
+```python
+from aerolex.generate import DEFAULT_SYSTEM_PROMPT, Generator
+
+system_prompt = DEFAULT_SYSTEM_PROMPT + "\nExplain in plain language."
+user_prompt_template = (
+    "{profile_block}\n\n"
+    "Context passages:\n{context_text}\n\n"
+    "Question: {query}\n\n"
+    "Give a concise answer and cite every factual claim with [[chunk_id]]:"
+)
+
+result = Generator().generate(
+    query,
+    final_chunks,
+    system_prompt=system_prompt,
+    user_prompt_template=user_prompt_template,
+)
+print(result)
+```
+
+The user prompt template uses Python `str.format` placeholders:
+
+| Placeholder | Inserted value |
+|---|---|
+| `{query}` | The question passed to generation |
+| `{context_text}` | Retrieved passages labeled with their chunk IDs and source citations |
+| `{profile_block}` | User-profile text, or an empty string when not supplied |
+
+A custom template replaces the entire default user prompt; content is not
+automatically appended if its placeholder is omitted. Keep `{context_text}`,
+`{query}`, and the `[[chunk_id]]` citation instructions for grounded answers. Include
+`{profile_block}` to retain profile personalization. Use `{{` and `}}` for
+literal braces, such as in JSON examples. Unknown placeholders and malformed
+format strings raise `ValueError`, including in offline mode.
+
+The full pipeline accepts the same overrides and supplies the retrieved context
+and profile automatically:
+
+```python
+out = pipe.answer(
+    "If my flight is cancelled, what am I owed?",
+    memory=mem,
+    profile=prof,
+    user_id="demo_user",
+    system_prompt=system_prompt,
+    user_prompt_template=user_prompt_template,
+)
+print(out["answer"])
+```
+
+These options change answer generation, not query rewriting or retrieval.
+`Generator.generate(...)` returns a plain string, both online and offline.
+It accepts chunk objects or a prebuilt context string and does not resolve,
+validate, or remove citation markers. The standalone `resolve_citations`
+helper remains available for explicit use but is not called by generation or
+the pipeline.
+
+`RagPipeline.answer(...)` wraps that string in a dictionary with `answer`,
+`query`, `standalone_query`, and `chunks`. It does not return a `references`
+field; remove any `out["references"]` printing loop. Retrieved sources can
+still be inspected through `out["chunks"]`.
+
+Without an API key, generation returns an offline-mode notice followed by the
+formatted context (or the supplied context string), rather than calling an LLM.
+Prompt customization requires LLM generation.

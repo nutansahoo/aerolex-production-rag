@@ -48,8 +48,10 @@ class RagPipeline:
         return [self.chunks[cid] for cid in final_ids if cid in self.chunks]
 
     def answer(self, query: str, memory=None, profile=None,
-               user_id: str = "default", feedback=None) -> dict:
-        """Full pipeline: optional memory/profile/feedback + grounded answer."""
+               user_id: str = "default", feedback=None, *,
+               system_prompt: str | None = None,
+               user_prompt_template: str | None = None) -> dict:
+        """Return answer text and query/chunk metadata, without resolved references."""
         standalone = memory.condense(query) if memory is not None else query
         chunks = self.retrieve(standalone, feedback=feedback)
 
@@ -57,10 +59,22 @@ class RagPipeline:
         if self.generator is None:
             from .generate import Generator
             self.generator = Generator()
-        result = self.generator.generate(standalone, chunks, profile_block=profile_block)
-        result.update(query=query, standalone_query=standalone, chunks=chunks)
+        generation_options = {"profile_block": profile_block}
+        if system_prompt is not None:
+            generation_options["system_prompt"] = system_prompt
+        if user_prompt_template is not None:
+            generation_options["user_prompt_template"] = user_prompt_template
+        answer = self.generator.generate(standalone, chunks, **generation_options)
+        if not isinstance(answer, str):
+            raise TypeError("generator.generate() must return a string")
+        result = {
+            "answer": answer,
+            "query": query,
+            "standalone_query": standalone,
+            "chunks": chunks,
+        }
 
         if memory is not None:
             memory.add_user(query)
-            memory.add_assistant(result["answer"])
+            memory.add_assistant(answer)
         return result

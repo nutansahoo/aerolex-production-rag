@@ -27,7 +27,7 @@ PROFILE_DB = CACHE_DIR / "user_profiles.sqlite3"   # long-term memory (feature #
 FEEDBACK_DB = CACHE_DIR / "feedback.sqlite3"        # FLAIR feedback (feature #10)
 
 # Gemini settings used by the workshop notebook and its embedding cache.
-GEN_MODEL = "gemini-flash-latest"
+GEN_MODEL = "gemini-3.5-flash-lite"
 EMBED_MODEL = "gemini-embedding-001"
 EMBED_DIM = 768
 
