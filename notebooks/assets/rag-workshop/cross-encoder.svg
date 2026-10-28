@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="450" viewBox="0 0 1000 450" role="img" aria-labelledby="title desc">
+  <title id="title">A cross-encoder jointly scores a query and each candidate</title>
+  <desc id="desc">After retrieval and fusion, the shortlist B, A, C enters a local cross-encoder. Each candidate is read together with the question. Illustrative relevance scores reorder the passages to A then B then C. Only the best candidates are selected for the prompt. The model cannot recover a passage that retrieval missed, and its scores are not probabilities.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#475569"/></marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #0f172a; font-size: 23px; }
+      .title { font-size: 29px; font-weight: 700; }
+      .small { font-size: 20px; fill: #475569; }
+      .flow { fill: none; stroke: #475569; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1000" height="450" rx="18" fill="#f8fafc"/>
+  <text x="32" y="44" class="title">Retrieve broadly. Then read query + passage together.</text>
+  <rect x="350" y="72" width="300" height="54" rx="12" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="500" y="107" text-anchor="middle" font-weight="700">Question</text>
+  <path d="M500 126V177" class="flow"/>
+  <text x="40" y="161" class="small">Fused candidates</text>
+  <rect x="40" y="185" width="220" height="50" rx="10" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="150" y="217" text-anchor="middle">Passage B</text>
+  <rect x="40" y="253" width="220" height="50" rx="10" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="150" y="285" text-anchor="middle">Passage A</text>
+  <rect x="40" y="321" width="220" height="50" rx="10" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="150" y="353" text-anchor="middle">Passage C</text>
+  <path d="M260 210H348" class="flow"/>
+  <path d="M260 278H348" class="flow"/>
+  <path d="M260 346H348" class="flow"/>
+
+  <rect x="350" y="179" width="300" height="204" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+  <text x="500" y="212" text-anchor="middle" font-weight="700">Cross-encoder</text>
+  <text x="500" y="241" text-anchor="middle" class="small">one joint read per pair</text>
+  <text x="376" y="284">(query, B) → 0.8</text>
+  <text x="376" y="324" font-weight="700">(query, A) → 3.2</text>
+  <text x="376" y="364">(query, C) → −1.1</text>
+  <path d="M650 281H738" class="flow"/>
+  <rect x="740" y="211" width="220" height="142" rx="12" fill="#f0fdfa" stroke="#0f766e" stroke-width="2"/>
+  <text x="850" y="245" text-anchor="middle" font-weight="700">Select the best</text>
+  <text x="850" y="283" text-anchor="middle">A → B → C</text>
+  <text x="850" y="322" text-anchor="middle" class="small">context for the LLM</text>
+  <text x="40" y="420" class="small">Toy scores, not probabilities. Reranking cannot recover candidates retrieval missed.</text>
+</svg>

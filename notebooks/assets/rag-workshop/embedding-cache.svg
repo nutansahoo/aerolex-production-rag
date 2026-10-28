@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="450" viewBox="0 0 1000 450" role="img" aria-labelledby="title desc">
+  <title id="title">Cache document embeddings; embed each question for search</title>
+  <desc id="desc">At index time, chunks and their IDs are sent to the document embedding model and saved as reusable vectors. At query time, a question is embedded in the same vector space and compared with those cached vectors by cosine similarity. This caches vectors, not answers, and changes to text or the embedding space require rebuilding.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#475569"/></marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #0f172a; font-size: 23px; }
+      .title { font-size: 29px; font-weight: 700; }
+      .label { font-size: 19px; font-weight: 700; fill: #475569; }
+      .small { font-size: 20px; fill: #475569; }
+      .flow { fill: none; stroke: #475569; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1000" height="450" rx="18" fill="#f8fafc"/>
+  <text x="32" y="44" class="title">Compute document vectors once per corpus version.</text>
+  <text x="40" y="87" class="label">INDEX TIME · create / refresh</text>
+  <rect x="40" y="105" width="220" height="85" rx="12" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="150" y="141" text-anchor="middle" font-weight="700">Chunks + IDs</text>
+  <text x="150" y="169" text-anchor="middle" class="small">text + legal context</text>
+  <path d="M260 148H333" class="flow"/>
+  <rect x="335" y="105" width="280" height="85" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+  <text x="475" y="141" text-anchor="middle" font-weight="700">Document embeddings</text>
+  <text x="475" y="169" text-anchor="middle" class="small">Gemini API · batched</text>
+  <path d="M615 148H718" class="flow"/>
+  <rect x="720" y="105" width="240" height="85" rx="12" fill="#f0fdfa" stroke="#0f766e" stroke-width="2"/>
+  <text x="840" y="141" text-anchor="middle" font-weight="700">Saved vectors</text>
+  <text x="840" y="169" text-anchor="middle" class="small">IDs + NumPy matrix</text>
+
+  <text x="40" y="263" class="label">QUERY TIME · repeat for each new question</text>
+  <rect x="40" y="282" width="220" height="85" rx="12" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="150" y="331" text-anchor="middle" font-weight="700">Question</text>
+  <path d="M260 325H333" class="flow"/>
+  <rect x="335" y="282" width="280" height="85" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+  <text x="475" y="318" text-anchor="middle" font-weight="700">Query embedding</text>
+  <text x="475" y="346" text-anchor="middle" class="small">compatible vector space</text>
+  <path d="M615 325H718" class="flow"/>
+  <path d="M840 190V280" class="flow"/>
+  <text x="856" y="238" class="small">reuse</text>
+  <rect x="720" y="282" width="240" height="85" rx="12" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="840" y="318" text-anchor="middle" font-weight="700">Cosine search</text>
+  <text x="840" y="346" text-anchor="middle" class="small">rank similar passages</text>
+  <text x="40" y="410" class="small">Cache vectors, not answers. Query embedding + generation still do work.</text>
+  <text x="40" y="437" class="small">Changed text, chunking, model, or dimensions? Rebuild the matching cache pair.</text>
+</svg>

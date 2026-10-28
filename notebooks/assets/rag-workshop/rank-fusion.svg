@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="410" viewBox="0 0 1000 410" role="img" aria-labelledby="title desc">
+  <title id="title">Reciprocal rank fusion adds votes from list positions</title>
+  <desc id="desc">In an independent arithmetic example, BM25 ranks A first, B second, C third. Vector search ranks B first, C second, A third. With a contribution of one divided by sixty plus one-based rank, B totals 0.03252, A totals 0.03227, and C totals 0.03200. B wins through consistently high ranks. Original retrieval scores are not added.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#475569"/></marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #0f172a; font-size: 23px; }
+      .title { font-size: 29px; font-weight: 700; }
+      .small { font-size: 20px; fill: #475569; }
+      .flow { fill: none; stroke: #475569; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1000" height="410" rx="18" fill="#f8fafc"/>
+  <text x="32" y="44" class="title">Keep the positions. Discard the incompatible score scales.</text>
+  <text x="40" y="86" class="small">Illustrative rank lists · independent of the cat/street example</text>
+  <rect x="40" y="113" width="226" height="226" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+  <text x="64" y="151" font-weight="700">BM25 list</text>
+  <text x="64" y="198">1st → passage A</text>
+  <text x="64" y="249">2nd → passage B</text>
+  <text x="64" y="300">3rd → passage C</text>
+  <rect x="318" y="113" width="226" height="226" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+  <text x="342" y="151" font-weight="700">Vector list</text>
+  <text x="342" y="198">1st → passage B</text>
+  <text x="342" y="249">2nd → passage C</text>
+  <text x="342" y="300">3rd → passage A</text>
+  <path d="M266 352H572V256H644" class="flow"/>
+  <path d="M544 205H644" class="flow"/>
+  <path d="M153 339V352" fill="none" stroke="#475569" stroke-width="2"/>
+  <path d="M153 352H266" fill="none" stroke="#475569" stroke-width="2"/>
+  <rect x="646" y="113" width="314" height="226" rx="12" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="670" y="151" font-weight="700">Add rank votes · k = 60</text>
+  <rect x="662" y="172" width="282" height="44" rx="8" fill="#ccfbf1"/>
+  <text x="680" y="202" font-weight="700">B → 0.03252</text>
+  <text x="680" y="253">A → 0.03227</text>
+  <text x="680" y="304">C → 0.03200</text>
+  <text x="40" y="389" class="small">A first-place result gets a little more weight; appearing high in both lists helps.</text>
+</svg>

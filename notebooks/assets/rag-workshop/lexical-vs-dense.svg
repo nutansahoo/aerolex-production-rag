@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="610" viewBox="0 0 1000 610" role="img" aria-labelledby="title desc">
+  <title id="title">BM25 and vector search see different signals</title>
+  <desc id="desc">For the query cat crossing a street, passage A says a cat sat beside the street, passage B says a feline dashed across the road, and passage C is about a dog chasing a ball. A has literal query words; B is a paraphrase of the action. BM25 uses term statistics and vector search uses learned similarity. These preferences are illustrations, not measured rankings. Combining their candidate lists can capture both signals.</desc>
+  <style>
+    text { font-family: Arial, Helvetica, sans-serif; fill: #0f172a; font-size: 23px; }
+    .title { font-size: 29px; font-weight: 700; }
+    .small { font-size: 20px; fill: #475569; }
+    .strong { font-weight: 700; }
+  </style>
+  <rect width="1000" height="610" rx="18" fill="#f8fafc"/>
+  <text x="32" y="44" class="title">Same question. Two complementary retrieval signals.</text>
+  <rect x="32" y="70" width="936" height="62" rx="12" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="56" y="110"><tspan class="strong">Query:</tspan> cat crossing a street</text>
+
+  <text x="48" y="178"><tspan class="strong">A</tspan> · A <tspan fill="#1d4ed8" class="strong">cat</tspan> sat beside the <tspan fill="#1d4ed8" class="strong">street</tspan>.</text>
+  <text x="48" y="218"><tspan class="strong">B</tspan> · A <tspan fill="#6d28d9" class="strong">feline dashed across the road</tspan>.</text>
+  <text x="48" y="258"><tspan class="strong">C</tspan> · A dog chased a ball in the park.</text>
+
+  <rect x="32" y="290" width="450" height="228" rx="14" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+  <text x="56" y="329" fill="#1d4ed8" class="strong">BM25 · lexical</text>
+  <text x="56" y="364">Which query terms occur?</text>
+  <text x="56" y="399" class="small">Term rarity + frequency + length</text>
+  <rect x="56" y="431" width="402" height="62" rx="10" fill="#ffffff"/>
+  <text x="74" y="470"><tspan class="strong">A:</tspan> literal “cat” + “street”</text>
+
+  <rect x="518" y="290" width="450" height="228" rx="14" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+  <text x="542" y="329" fill="#6d28d9" class="strong">Vector search · dense</text>
+  <text x="542" y="364">Which meanings are close?</text>
+  <text x="542" y="399" class="small">Learned vectors + similarity</text>
+  <rect x="542" y="431" width="402" height="62" rx="10" fill="#ffffff"/>
+  <text x="560" y="470"><tspan class="strong">B:</tspan> a close paraphrase</text>
+
+  <text x="500" y="556" text-anchor="middle" font-weight="700">Hybrid retrieval keeps candidates from both approaches.</text>
+  <text x="500" y="589" text-anchor="middle" class="small">Illustrative signals, not measured rankings. Neither approach guarantees relevance.</text>
+</svg>
