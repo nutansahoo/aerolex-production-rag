@@ -9,6 +9,8 @@ git clone https://github.com/nutansahoo/aerolex-production-rag.git
 
 ## Workshop setup (Windows, macOS, and Linux)
 
+Choose local **Conda / venv** below, or the [Google Colab browser-only path](#google-colab-no-local-python-installation).
+
 Complete these steps before the workshop. Run the commands from the project root, the folder containing [environment.yml](environment.yml) and
 [pyproject.toml](pyproject.toml).
 Unless labeled otherwise, the commands work in PowerShell (Windows) and
@@ -168,6 +170,103 @@ python -c "from aerolex.config import load_api_key; key = load_api_key(); print(
 Expect the selected Python version, no broken package requirements, and a path
 to this checkout's `aerolex` package. The final command checks key presence
 without printing it.
+
+## Google Colab (no local Python installation)
+
+[Open the solution notebook in Colab](https://colab.research.google.com/github/nutansahoo/aerolex-production-rag/blob/main/notebooks/workshop_solution.ipynb)
+
+Colab supplies a managed Python/Linux runtime in your browser: no local Conda,
+venv activation, VS Code extensions, or kernel registration. Project packages
+still need installation in each fresh VM. This route is intended for a standard
+**CPU runtime**; a GPU is not required.
+
+### First run
+
+1. Open the link, **save a copy in Drive**, and connect a managed Python runtime
+   with no accelerator. Saving a copy preserves your notebook edits, not the VM.
+2. In the **Secrets** panel (key icon), add `GEMINI_API_KEY` and enable notebook
+   access. Each participant uses their own key and access permission. No `.env`
+   upload is needed; never paste credentials into cells, outputs, or clone URLs.
+3. Before any `aerolex` imports, run the notebook's **Colab-only setup cell**.
+   Opening an ipynb from GitHub does not copy its package, PDFs, or caches into
+   the runtime. The cell clones this public repo into
+   `/content/aerolex-production-rag`, installs it using the runtime's Python
+   (`python -m pip`, equivalent to `%pip` for interpreter selection), and loads
+   the Secret into the environment for the existing API-key loader.
+4. Keep `COLAB_REF` aligned with the notebook version you opened. `main` is the
+   moving default; for an event, instructors should test and publish the same
+   commit in the Colab URL (`.../blob/<commit>/notebooks/workshop_solution.ipynb`)
+   and `COLAB_REF`. The setup reuses an existing matching checkout but never
+   pulls, resets, or overwrites it to change versions. Save your work before
+   using a fresh runtime or deliberately managing Git yourself.
+5. In the existing setup cell, set **`CHUNKING_STRATEGY = "hierarchical"`** for
+   the first run. The public repo includes the four PDFs and hierarchical
+   caches; it does **not** include recursive caches. Leave the notebook's other
+   settings alone, then run top to bottom. Document vectors load from cache;
+   query embeddings and generation still call Gemini.
+
+If dependency installation asks for a session restart, restart and rerun the
+Colab setup before the application cells. Do not install Conda or create a
+nested venv inside Colab. The local Conda/venv paths and notebook strategy
+default are unchanged.
+
+The first reranker use downloads a public model. Colab resources are limited
+and not guaranteed, and its preinstalled Python/packages change over time.
+**Colab access (including paid Colab plans) does not supply Gemini API quota**;
+model access, billing, and rate limits belong to your Gemini project.
+
+### Optional recursive caches and persistence
+
+After the baseline works, run this in a Colab code cell:
+
+```python
+!python -m aerolex.prepare_recursive_cache
+```
+
+This sends corpus text to Gemini and consumes quota. It refuses to overwrite
+existing recursive artifacts; do not rerun blindly after an error. Once it
+succeeds, change `CHUNKING_STRATEGY` to `"recursive"` and rerun the tutorial in
+order. After a kernel restart, rerun the Colab setup to reload the Secret.
+
+VM packages, cloned files, model downloads, recursive caches, and SQLite state
+are ephemeral. A session restart may retain disk, but a deleted/recycled VM
+does not. Download or privately back up matching cache pairs and desired state
+before disposal. Optional Drive mounting grants notebook code access to Drive;
+copy needed artifacts to/from `/content` rather than running all I/O on Drive.
+Drive mounting is not required for the recommended setup.
+
+**ZIP alternative:** upload and extract a project ZIP without `.env`, `.venv`,
+or secrets, find its root containing `pyproject.toml` and `data/`, and install
+that checkout with `%pip install -e /content/path/to/project`. Skip the
+GitHub-cloning bootstrap; load the Secret separately before the existing setup:
+
+```python
+import os
+from google.colab import userdata
+
+os.environ["GEMINI_API_KEY"] = userdata.get("GEMINI_API_KEY")
+```
+
+Uploading only the ipynb does not include its code/data/assets. Review notebook
+code before granting Secrets or Drive access; notebook outputs are shareable.
+
+### Instructor pilot checklist
+
+This workflow is based on [Colab's documentation](https://research.google.com/colaboratory/faq.html);
+**a full hosted Colab run has not yet been verified for this project**.
+Before sharing an event link, try a fresh CPU runtime and confirm:
+
+- The bootstrap completes; `import aerolex; print(aerolex.__file__)` points
+  inside `/content/aerolex-production-rag`, and no credential is displayed.
+- The hierarchical cache aligns at **234 × 768**, with no document-embedding
+  API requests; query embedding, reranking, and the final answer complete.
+- The diagrams render. Colab may not resolve notebook-relative SVG links even
+  after cloning; the [GitHub assets](notebooks/assets/rag-workshop/) provide a
+  fallback. Confirm frontend rendering before changing image URLs or adding
+  Colab-specific display code.
+- A new runtime can repeat setup; Gemini quota errors are handled as service
+  limits rather than by reinstalling environments. Inspect concrete package
+  conflicts before adding pins or upgrading unrelated preinstalled packages.
 
 ## Comparing chunking strategies
 

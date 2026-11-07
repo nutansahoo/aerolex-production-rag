@@ -31,7 +31,13 @@ class ChunkingNotebookTests(unittest.TestCase):
                 RECURSIVE_EMBEDDINGS_CACHE=directory / "embeddings_recursive.npz",
             )
         )
-        self.stack.enter_context(patch.object(config, "load_api_key", return_value=None))
+        self.stack.enter_context(
+            patch.object(config, "load_api_key", return_value="test-placeholder")
+        )
+        self.stack.enter_context(patch("google.genai.Client"))
+        self.query_embedder = self.stack.enter_context(
+            patch("aerolex.embeddings.GeminiEmbedder.embed_query")
+        )
         self.docs = [
             Document(
                 doc_id="eu261",
@@ -76,8 +82,9 @@ class ChunkingNotebookTests(unittest.TestCase):
 
     def select_strategy(self, strategy):
         namespace = {}
-        setup = self.cells["970866dd"].replace(
-            'CHUNKING_STRATEGY = "hierarchical"', f"CHUNKING_STRATEGY = {strategy!r}"
+        self.execute("970866dd", namespace)
+        setup = self.cells["a1c04fe4"].replace(
+            'CHUNKING_STRATEGY = "recursive"', f"CHUNKING_STRATEGY = {strategy!r}"
         )
         exec(compile(setup, "notebook:setup", "exec"), namespace)
         self.execute("ec6b8035", namespace)
@@ -99,13 +106,18 @@ class ChunkingNotebookTests(unittest.TestCase):
                 self.assertEqual(namespace["alternate_chunks"], self.alternate)
                 self.assertEqual(namespace["hierarchical_chunks"], self.baseline)
                 for cell_id in (
+                    "dc4c44bb",  # tokenizer
                     "c7d10611",  # BM25
-                    "eea5a9ac",  # selected store with alignment guards
+                    "e45f5d2c",  # selected store with alignment guards
                     "10ca0b58",  # cosine self-check
-                    "041e2750",  # offline Article 7 query vector
+                    "041e2750",  # mocked query embedding
                     "348e641e",  # RRF definition and assertion
                     fusion_cell,
                 ):
+                    if cell_id == "041e2750":
+                        self.query_embedder.return_value = namespace["store"].matrix[
+                            namespace["store"].ids.index(namespace["art7"].chunk_id)
+                        ]
                     self.execute(cell_id, namespace)
                 ids = {c.chunk_id for c in expected}
                 self.assertEqual(set(namespace["by_id"]), ids)
@@ -114,16 +126,14 @@ class ChunkingNotebookTests(unittest.TestCase):
                 self.assertTrue({cid for cid, _ in namespace["fused"]} <= ids)
 
                 embedder = Mock()
-                embedder.embed_query.return_value = namespace["qvec"]
+                embedder.embed_query.return_value = namespace["query_vector"]
                 reranker = Mock()
                 reranker.rerank.side_effect = lambda query, pairs, top_k: [
                     (cid, float(top_k - i))
                     for i, (cid, _) in enumerate(pairs[:top_k])
                 ]
                 generator = Mock()
-                generator.generate.return_value = {
-                    "answer": "Fixture answer [[1]]", "references": [], "offline": True
-                }
+                generator.generate.return_value = "Fixture answer [[chunk_id]]"
                 pipeline = RagPipeline(
                     chunks=expected,
                     store=namespace["store"],
@@ -145,13 +155,13 @@ class ChunkingNotebookTests(unittest.TestCase):
         config.RECURSIVE_CHUNKS_CACHE.unlink()
         namespace = self.select_strategy("recursive")
         self.assertEqual(namespace["alternate_chunks"], self.alternate)
-        self.execute("eea5a9ac", namespace)
+        self.execute("e45f5d2c", namespace)
 
     def test_missing_baseline_chunks_are_split_locally(self):
         config.CHUNKS_CACHE.unlink()
         namespace = self.select_strategy("hierarchical")
         self.assertEqual(namespace["hierarchical_chunks"], self.baseline)
-        self.execute("eea5a9ac", namespace)
+        self.execute("e45f5d2c", namespace)
 
     def test_missing_selected_embeddings_name_the_correct_command(self):
         for strategy, path, command in (
@@ -162,13 +172,13 @@ class ChunkingNotebookTests(unittest.TestCase):
                 namespace = self.select_strategy(strategy)
                 path.unlink()
                 with self.assertRaisesRegex(FileNotFoundError, command):
-                    self.execute("eea5a9ac", namespace)
+                    self.execute("e45f5d2c", namespace)
 
     def test_wrong_strategy_embeddings_are_rejected(self):
         namespace = self.select_strategy("recursive")
-        namespace["embeddings_cache"] = config.EMBEDDINGS_CACHE
-        with self.assertRaisesRegex(ValueError, "do not match"):
-            self.execute("eea5a9ac", namespace)
+        namespace["embeddings_path"] = config.EMBEDDINGS_CACHE
+        with self.assertRaisesRegex(ValueError, "do not align"):
+            self.execute("e45f5d2c", namespace)
 
     def test_bad_embedding_dimensions_and_duplicate_ids_are_rejected(self):
         namespace = self.select_strategy("recursive")
@@ -177,10 +187,10 @@ class ChunkingNotebookTests(unittest.TestCase):
             config.RECURSIVE_EMBEDDINGS_CACHE
         )
         with self.assertRaisesRegex(ValueError, "dimensions"):
-            self.execute("eea5a9ac", namespace)
+            self.execute("e45f5d2c", namespace)
         namespace["chunks"] = [self.alternate[0]] * len(ids)
-        with self.assertRaisesRegex(ValueError, "do not match"):
-            self.execute("eea5a9ac", namespace)
+        with self.assertRaisesRegex(ValueError, "do not align"):
+            self.execute("e45f5d2c", namespace)
 
     def test_repeated_selection_does_not_replace_preserved_baseline(self):
         namespace = self.select_strategy("recursive")
