@@ -173,7 +173,7 @@ without printing it.
 
 ## Google Colab (no local Python installation)
 
-[Open the solution notebook in Colab](https://colab.research.google.com/github/nutansahoo/aerolex-production-rag/blob/main/notebooks/workshop_solution.ipynb)
+[Open the notebook in Colab](https://colab.research.google.com/github/nutansahoo/aerolex-production-rag/blob/main/notebooks/workshop.ipynb)
 
 Colab supplies a managed Python/Linux runtime in your browser: no local Conda,
 venv activation, VS Code extensions, or kernel registration. Project packages
