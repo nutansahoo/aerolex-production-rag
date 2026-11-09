@@ -209,24 +209,6 @@ If dependency installation asks for a session restart, restart and rerun the
 Colab setup before the application cells.
 
 ### Optional: recursive caches and persistence
-
-After the baseline works, run this in a Colab code cell, if you wanna try recursive chunking as well:
-
-```python
-!python -m aerolex.prepare_recursive_cache
-```
-or in your local terminal:
-
-```bash
-python -m pip install -e .
-python -m aerolex.prepare_recursive_cache
-```
-
-This sends corpus text to Gemini and consumes quota. It refuses to overwrite
-existing recursive artifacts; do not rerun blindly after an error. Once it
-succeeds, change `CHUNKING_STRATEGY` to `"recursive"` and rerun the tutorial in
-order. After a kernel restart, rerun the Colab setup to reload the Secret.
-
 In the setup cell of `notebooks/workshop_solution.ipynb`, choose:
 
 ```python
