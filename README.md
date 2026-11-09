@@ -1,6 +1,6 @@
-# aerolex-production-rag
-# ✈️ AeroLex: Production-Grade RAG Pipeline.  A reference implementation of a production-grade, multi-stage Retrieval-Augmented Generation (RAG) system built from first principles in Python—demonstrated over complex statutory aviation regulations (EU261, US DOT 14 CFR 260) and carrier contracts of carriage.
+# ✈️ AeroLex: Evidence-first answers for airline passengers
 
+This repo contains the code for building a RAG pipeline for a chatbot for airlines' passenger rights. 
 
 ## Clone the Repo
 ```
@@ -139,7 +139,7 @@ $env:GEMINI_API_KEY = Read-Host "Paste your Gemini API key"
 
 OR Follow these steps:
 
-1. Search for System Properties, select Advanced → Environment Variables…
+1. Search for "View Advanced System Settings" in windows search bar
 2. Under User variables, click New… and enter:
   - Variable name: GEMINI_API_KEY
   - Variable value: Your API key, without quotes.
@@ -206,134 +206,13 @@ still need installation in each fresh VM. This route is intended for a standard
    query embeddings and generation still call Gemini.
 
 If dependency installation asks for a session restart, restart and rerun the
-Colab setup before the application cells. Do not install Conda or create a
-nested venv inside Colab. The local Conda/venv paths and notebook strategy
-default are unchanged.
+Colab setup before the application cells.
 
-The first reranker use downloads a public model. Colab resources are limited
-and not guaranteed, and its preinstalled Python/packages change over time.
-**Colab access (including paid Colab plans) does not supply Gemini API quota**;
-model access, billing, and rate limits belong to your Gemini project.
-
-### Optional recursive caches and persistence
-
-After the baseline works, run this in a Colab code cell:
-
-```python
-!python -m aerolex.prepare_recursive_cache
-```
-
-This sends corpus text to Gemini and consumes quota. It refuses to overwrite
-existing recursive artifacts; do not rerun blindly after an error. Once it
-succeeds, change `CHUNKING_STRATEGY` to `"recursive"` and rerun the tutorial in
-order. After a kernel restart, rerun the Colab setup to reload the Secret.
-
-VM packages, cloned files, model downloads, recursive caches, and SQLite state
-are ephemeral. A session restart may retain disk, but a deleted/recycled VM
-does not. Download or privately back up matching cache pairs and desired state
-before disposal. Optional Drive mounting grants notebook code access to Drive;
-copy needed artifacts to/from `/content` rather than running all I/O on Drive.
-Drive mounting is not required for the recommended setup.
-
-**ZIP alternative:** upload and extract a project ZIP without `.env`, `.venv`,
-or secrets, find its root containing `pyproject.toml` and `data/`, and install
-that checkout with `%pip install -e /content/path/to/project`. Skip the
-GitHub-cloning bootstrap; load the Secret separately before the existing setup:
-
-```python
-import os
-from google.colab import userdata
-
-os.environ["GEMINI_API_KEY"] = userdata.get("GEMINI_API_KEY")
-```
-
-Uploading only the ipynb does not include its code/data/assets. Review notebook
-code before granting Secrets or Drive access; notebook outputs are shareable.
-
-### Instructor pilot checklist
-
-This workflow is based on [Colab's documentation](https://research.google.com/colaboratory/faq.html);
-**a full hosted Colab run has not yet been verified for this project**.
-Before sharing an event link, try a fresh CPU runtime and confirm:
-
-- The bootstrap completes; `import aerolex; print(aerolex.__file__)` points
-  inside `/content/aerolex-production-rag`, and no credential is displayed.
-- The hierarchical cache aligns at **234 × 768**, with no document-embedding
-  API requests; query embedding, reranking, and the final answer complete.
-- The diagrams render. Colab may not resolve notebook-relative SVG links even
-  after cloning; the [GitHub assets](notebooks/assets/rag-workshop/) provide a
-  fallback. Confirm frontend rendering before changing image URLs or adding
-  Colab-specific display code.
-- A new runtime can repeat setup; Gemini quota errors are handled as service
-  limits rather than by reinstalling environments. Inspect concrete package
-  conflicts before adding pins or upgrading unrelated preinstalled packages.
-
-## Comparing chunking strategies
-
-The notebook supports two strategies with the same `Chunk` schema and legal
-citations:
-
-| Strategy | Body splitting | Cache files under `cache/` |
-| --- | --- | --- |
-| `hierarchical` (default) | Existing paragraph packing and character-window fallback | `chunks.json`, `embeddings.npz` |
-| `recursive` | LangChain `RecursiveCharacterTextSplitter` within the same legal sections | `chunks_recursive.json`, `embeddings_recursive.npz` |
-
-The recursive splitter tries paragraphs, lines, spaces, then individual
-characters. It uses a 1,600-character body limit and 150-character target
-overlap. Actual overlap can be smaller; sentence boundaries are not guaranteed.
-The heading prepended for retrieval is additional to the body limit. This is
-not semantic or token-based chunking, and improved retrieval quality is not
-assumed. The original custom strategy and its caches remain unchanged.
-
-### One-time recursive cache preparation
-
-With your chosen environment active (or using its Python executable directly),
-run from the repository root:
-
-```bash
-python -m pip install -e .
-python -m aerolex.prepare_recursive_cache
-```
-
-The install adds the lightweight `langchain-text-splitters` dependency; the
-full LangChain application stack is not required. The preparation command
-uses the existing PDF loader and legal-section parser, recursively splits the
-original section bodies, and embeds their searchable text with the same Gemini
-model and dimensions as the baseline. It validates and saves a matching chunk
-and embedding pair, ending with `Cache verified: (N, 768)`. The chunk count
-`N` need not match the baseline.
-
-**Preparation sends corpus text to Gemini and consumes API quota.** Configure
-`GEMINI_API_KEY` first. The command refuses to overwrite either recursive cache
-file and never changes the baseline caches. Failed API requests or interrupted
-runs may consume quota; completed batches are not checkpointed. To rebuild
-intentionally, move both recursive files aside first. Rebuild the pair whenever
-the corpus, splitter settings, or embedding model/dimensions change.
-
-### Select the notebook strategy
-
+### Optional: recursive caches and persistence
 In the setup cell of `notebooks/workshop_solution.ipynb`, choose:
 
 ```python
 CHUNKING_STRATEGY = "recursive"  # "hierarchical" keeps the existing baseline
 ```
 
-Restart the kernel and run top to bottom after changing this setting. Directly
-under the hierarchical example, the new cell defines `alternate_chunks`,
-prints a citation example, and selects the downstream `chunks`, lookup
-metadata, and embedding-cache path together. If recursive chunks are not
-cached, that cell can split them locally without API calls, but section 3
-still requires the separately prepared recursive embeddings.
-
-Do not replace `chunks` alone while keeping the baseline vector store: vectors
-must correspond to the selected chunk IDs and text. The notebook checks ordered
-ID alignment and dimensions before retrieval. BM25 is rebuilt from the selected
-chunks; reranking, citations, and the final pipeline use the same selection.
-Recursive IDs are namespaced so baseline feedback votes cannot attach to
-different recursive passages.
-
-For a comparison, keep PDFs, size settings, embedding model, and retrieval
-settings fixed. Chunk counts, boundaries, and overlap behavior will still
-differ. Existing profile/feedback state and conversational history can affect
-outputs; a clean kernel resets in-memory history, not persisted SQLite state.
-This adds a comparison option, not an automated quality evaluation.
+Restart the kernel and run top to bottom after changing this setting, if you want to try this method of chunking.
